@@ -1,0 +1,248 @@
+/* Hopface — gaya "web 2013".
+   Latar abu-abu, kartu putih berbingkai tipis, tombol bergradasi halus dengan bingkai dan
+   text-shadow, input dengan bayangan dalam, aksen merah. Palet mengikuti AnyDown.
+   Ditulis mobile-first: aturan dasar untuk layar kecil, lalu diperluas dengan min-width. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+
+:root {
+  --page: #e4e4e4; --card: #fff; --line: #9a9a9a; --line-2: #c4c4c4; --head: #d8d8d8;
+  --tx: #111; --mut: #444; --dim: #777;
+  --red: #cc0000; --red-2: #e60000; --red-dk: #a30000;
+  --green: #2f7d2f; --green-2: #3a9a3a; --green-dk: #1d5a1d;
+  --blue: #0b3d91;
+  --you: #1f5fbf;       /* "You" biru, "Stranger" merah: warna log chat era Omegle */
+  --stranger: #cc0000;
+  --serif: Georgia, 'Times New Roman', Times, serif;
+  --tap: 44px;          /* tinggi minimum area sentuh di layar sentuh */
+}
+
+html { -webkit-text-size-adjust: 100% }
+body {
+  font-family: Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6;
+  color: var(--tx); background: var(--page);
+  -webkit-tap-highlight-color: transparent;
+}
+#app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh } /* footer selalu di dasar */
+a { color: var(--blue); text-decoration: none }
+a:hover { text-decoration: underline }
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation }
+img, video { max-width: 100% }
+img { display: block }
+.hidden { display: none !important }
+.center { text-align: center }
+.muted { color: var(--dim); font-size: .8rem }
+
+.shell { width: 100%; margin-inline: auto }
+@media (min-width: 721px) { .shell { max-width: min(100% - 2rem, 960px) } }
+
+/* tombol menu HP (tersembunyi di desktop) */
+.menubtn { display: none }
+@media (max-width: 720px) {
+  .nav { display: none }
+  .menubtn { display: inline-flex; min-height: 38px; align-self: center }
+}
+
+/* tautan footer Terms/Privacy disembunyikan di HP karena sudah ada di bottom sheet */
+@media (max-width: 720px) { .navfoot { display: none } }
+
+/* bottom sheet gaya 2013 */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40 }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
+  background: #f2f2f2; border-top: 2px solid var(--red); border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 16px rgba(0,0,0,.35);
+  padding: .3rem .9rem calc(.7rem + env(safe-area-inset-bottom));
+  max-height: 72vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  animation: sheetup .18s ease-out;
+}
+@keyframes sheetup { from { transform: translateY(35%); opacity: .6 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none } }
+.grab { width: 44px; height: 5px; border-radius: 3px; background: #bbb; border: 1px solid #a5a5a5; margin: .25rem auto .5rem }
+.snav a { display: flex; align-items: center; gap: .65rem; min-height: 48px; padding: .3rem .2rem; border-bottom: 1px solid var(--line-2); color: #333; font-weight: 700; font-size: .95rem; font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif }
+.snav a i { color: var(--red); width: 1.3rem; text-align: center; text-shadow: 0 1px 0 #fff }
+.snav a:hover { background: #e8e8e8; text-decoration: none }
+
+/* ---------- header ---------- */
+header.top {
+  background: linear-gradient(#fff, #f1f1f1);
+  border-top: 3px solid var(--red); border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  padding-top: env(safe-area-inset-top);
+}
+.hd { display: flex; align-items: center; justify-content: space-between; gap: .4rem .8rem; min-height: 50px; padding: .3rem .7rem; flex-wrap: wrap }
+@media (min-width: 721px) { .hd { padding-inline: 0 } }
+.brand { display: flex; align-items: center; gap: .45rem; font-family: var(--serif); font-size: 1.4rem; font-weight: 700; color: var(--red); text-shadow: 0 1px 0 #fff; letter-spacing: -.02em; min-height: var(--tap) }
+.brand:hover { text-decoration: none }
+.beta { font: 700 .58rem/1 Verdana, Tahoma, sans-serif; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--dim); padding: .18rem .35rem; border-radius: 2px; text-shadow: none; margin-top: -.5rem }
+.nav { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; display: flex; gap: .2rem .9rem; font-size: .82rem; align-items: center; flex-wrap: wrap }
+.nav a, .nav button.link { color: var(--mut); background: none; border: 0; min-height: 32px; display: inline-flex; align-items: center }
+.nav a:hover, .nav button.link:hover { color: var(--tx); text-decoration: underline }
+.who { color: var(--dim); max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+@media (max-width: 480px) { .who { display: none } .nav { gap: .1rem .7rem } }
+
+/* Di HP yang sempit, brand cukup logo saja: teks nama dan tag beta disembunyikan. */
+@media (max-width: 720px) {
+  .bname, .beta { display: none }
+}
+
+main { flex: 1; padding: .7rem 0 1.5rem }
+@media (min-width: 721px) { main { padding: 1.5rem 0 2.5rem } }
+
+/* ---------- kartu & judul ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-left: 0; border-right: 0; box-shadow: 0 1px 2px rgba(0,0,0,.08); padding: 1.1rem .9rem; margin-bottom: .7rem }
+@media (min-width: 721px) { .card { border: 1px solid var(--line); padding: 1.5rem 1.25rem; margin-bottom: 1rem } }
+
+h1 { font-family: var(--serif); font-size: 1.45rem; font-weight: 700; text-align: center; letter-spacing: -.01em; color: #2b2b2b; line-height: 1.25; text-shadow: 0 1px 0 #fff }
+h1 .sub { display: block; color: var(--red); font-size: 1.05rem; font-weight: 400; font-style: italic }
+h2 { font-family: var(--serif); font-size: 1.15rem; margin: 0 0 .6rem; color: #2b2b2b; padding-bottom: .3rem; border-bottom: 1px dotted var(--line-2) }
+@media (min-width: 721px) { h1 { font-size: 1.7rem } h1 .sub { font-size: 1.25rem } }
+.lede { text-align: center; font-size: .86rem; color: var(--mut); margin: .5rem 0 1rem }
+
+/* ---------- tombol: gradasi halus + bingkai + text-shadow ---------- */
+.btn { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif;
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-height: var(--tap); padding: .45rem 1.1rem;
+  border: 1px solid #aaa; border-bottom-color: #8e8e8e; border-radius: 3px;
+  background: linear-gradient(#fff, #e3e3e3); color: #333; font-weight: 700; font-size: .9rem; line-height: 1.2;
+  text-shadow: 0 1px 0 #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.08);
+  user-select: none;
+}
+.btn:hover { background: linear-gradient(#fafafa, #d6d6d6); text-decoration: none }
+.btn:active { background: #d0d0d0; box-shadow: inset 0 2px 4px rgba(0,0,0,.18); transform: translateY(1px) }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none }
+.btn.red   { background: linear-gradient(#e83a3a, #b30000); border-color: #8c0000; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3) }
+.btn.red:hover   { background: linear-gradient(#f04848, #c20000) }
+.btn.green { background: linear-gradient(#4bb04b, #2a7a2a); border-color: #1d5a1d; color: #fff; text-shadow: 0 -1px 0 rgba(0,0,0,.3) }
+.btn.green:hover { background: linear-gradient(#58bf58, #328a32) }
+.btn.red:active, .btn.green:active { filter: brightness(.9) }
+.btn.big { font-size: 1rem; padding: .6rem 1.5rem }
+.btn.small { min-height: 34px; padding: .25rem .7rem; font-size: .78rem }
+
+/* ---------- form: bayangan dalam seperti input 2013 ---------- */
+label { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; display: block; font-size: .8rem; font-weight: 700; color: var(--mut); margin-bottom: .2rem }
+input[type=text], input[type=number], input[type=date], select, textarea {
+  width: 100%; min-height: var(--tap); padding: .45rem .55rem;
+  border: 1px solid #aaa; border-radius: 2px; background: #fff; color: var(--tx);
+  font: inherit; font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; font-size: 16px; /* >=16px: Android/iOS tidak memperbesar halaman saat fokus */
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+}
+select { background: #fff }
+input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--red); box-shadow: inset 0 1px 2px rgba(0,0,0,.1), 0 0 4px rgba(204,0,0,.35) }
+input:disabled, select:disabled { background: #f0f0f0; color: #888 }
+@media (min-width: 721px) { input[type=text], input[type=number], input[type=date], select, textarea { font-size: .9rem; min-height: 36px } }
+.field { margin-bottom: .9rem }
+.check { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; display: flex; gap: .55rem; align-items: flex-start; font-size: .84rem; font-weight: 400; color: var(--mut); min-height: 32px }
+.check input { width: 20px; height: 20px; min-height: 0; margin-top: .1rem; flex: none; box-shadow: none }
+.err { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; color: var(--red); font-size: .84rem; margin: .5rem 0 }
+.ok { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; color: var(--green); font-size: .84rem; margin: .5rem 0 }
+.form { max-width: 440px; margin: 0 auto }
+.form .btn { width: 100% }
+@media (min-width: 721px) { .form .btn { width: auto } }
+
+.gbtn { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif;
+  display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 48px; padding: .6rem 1.3rem;
+  border: 1px solid #aaa; border-radius: 3px; background: linear-gradient(#fff, #ececec); font-weight: 700; color: #333;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0,0,0,.1);
+}
+.gbtn:hover { background: linear-gradient(#fafafa, #e0e0e0); text-decoration: none }
+.gbtn svg { width: 20px; height: 20px; flex: none }
+@media (max-width: 480px) { .gbtn { width: 100% } }
+
+.strip { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; margin-top: .9rem }
+.strip span { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; font-size: .72rem; color: var(--mut); background: linear-gradient(#fff, #f2f2f2); border: 1px solid var(--line-2); border-radius: 3px; padding: .2rem .55rem }
+.intro { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line-2); font-size: .82rem; color: var(--mut); line-height: 1.75 }
+.intro b { color: var(--tx) }
+
+.banner { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; border: 1px solid var(--red); background: #fff3f3; color: #800; padding: .6rem .8rem; font-size: .84rem; margin: 0 0 .7rem; overflow-wrap: anywhere }
+.banner.info { border-color: var(--line); background: #f7f7f7; color: var(--mut) }
+@media (min-width: 721px) { .banner { margin-bottom: 1rem } }
+
+/* ---------- halaman chat ----------
+   Urutan di layar kecil: filter, video+chat, lalu tombol aksi MENEMPEL di dasar layar (mudah dijangkau ibu jari).
+   Di layar lebar: filter, tombol aksi, lalu video+chat. */
+.chat { display: flex; flex-direction: column }
+.chat > .banner { order: 0 }
+.fbox { order: 1 }
+.stage { order: 2 }
+.dock { order: 3 }
+@media (min-width: 721px) { .dock { order: 2 } .stage { order: 3 } }
+
+.fbox summary { display: flex; align-items: center; gap: .5rem; cursor: pointer; list-style: none; min-height: var(--tap); font-family: var(--serif); font-size: 1.1rem; font-weight: 700; color: #2b2b2b }
+.fbox summary::-webkit-details-marker { display: none }
+.fbox summary::before { content: '\25B8'; color: var(--red); font-size: .95rem; transition: transform .15s }
+.fbox[open] summary::before { transform: rotate(90deg) }
+.fbox summary .sum { margin-left: auto; font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; font-size: .74rem; color: var(--dim); text-align: right }
+.fbox[open] summary .sum { display: none }
+.fbox[open] summary { padding-bottom: .3rem; margin-bottom: .6rem; border-bottom: 1px dotted var(--line-2) }
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem }
+.filters .field { margin: 0 }
+.filters .field.wide { grid-column: 1 / -1 }
+@media (min-width: 721px) { .filters { grid-template-columns: repeat(4, 1fr); align-items: end } .filters .field.wide { grid-column: auto } }
+
+/* bilah aksi */
+.dock { background: var(--card); border: 1px solid var(--line); border-left: 0; border-right: 0; box-shadow: 0 1px 2px rgba(0,0,0,.08); padding: .6rem .7rem; margin-bottom: .7rem }
+.dock .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap }
+.dock .row .btn { flex: 1 1 0; min-width: 0 }
+.status { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; font-size: .8rem; color: var(--mut); flex: 0 0 100%; text-align: center }
+.status b { color: var(--tx) }
+.online { display: inline-flex; align-items: center; gap: .3rem }
+.online::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--green-2); box-shadow: 0 0 0 2px rgba(58,154,58,.25) }
+@media (min-width: 721px) {
+  .dock { border: 1px solid var(--line); padding: .8rem 1rem; margin-bottom: 1rem }
+  .dock .row .btn { flex: 0 0 auto }
+  .status { flex: 1 1 auto; text-align: right }
+}
+@media (max-width: 720px) {
+  .dock { position: sticky; bottom: 0; z-index: 20; margin-bottom: 0; background: linear-gradient(#fff, #ececec); box-shadow: 0 -2px 5px rgba(0,0,0,.15); padding-bottom: calc(.6rem + env(safe-area-inset-bottom)) }
+}
+
+.stage { display: grid; grid-template-columns: 1fr; gap: .7rem; margin-bottom: .7rem }
+@media (min-width: 721px) { .stage { grid-template-columns: 1.4fr 1fr; gap: 1rem; margin-bottom: 0 } }
+
+/* Dasar: tinggi eksplisit supaya area video tidak runtuh di webview lama.
+   Bila aspect-ratio didukung, ukuran lebih rapi mengikuti rasio. */
+.videos { position: relative; background: #111; border: 1px solid var(--line); border-left: 0; border-right: 0; height: 46vh; max-height: 70vh; overflow: hidden }
+@media (min-width: 481px) { .videos { height: 52vh } }
+@supports (aspect-ratio: 1 / 1) {
+  .videos { height: auto; aspect-ratio: 1 / 1 }
+  @media (min-width: 481px) { .videos { aspect-ratio: 4 / 3 } }
+}
+@media (min-width: 721px) { .videos { border: 1px solid var(--line) } }
+.videos video.remote { width: 100%; height: 100%; object-fit: cover; background: #111 }
+.videos video.local { position: absolute; right: 8px; bottom: 8px; width: 28%; min-width: 84px; aspect-ratio: 4 / 3; object-fit: cover; border: 2px solid #fff; border-radius: 2px; box-shadow: 0 1px 4px rgba(0,0,0,.5); background: #333; transform: scaleX(-1) }
+.overlay { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ddd; text-align: center; padding: 1rem; font-size: .9rem; gap: .5rem; pointer-events: none }
+.overlay b { font-size: 1.05rem; color: #fff; text-shadow: 0 1px 2px #000 }
+.overlay .spin { width: 28px; height: 28px; border: 3px solid #555; border-top-color: #fff; border-radius: 50%; animation: sp 1s linear infinite }
+@keyframes sp { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .overlay .spin { animation-duration: 3s } }
+.peer { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0,0,0,.7); color: #fff; padding: .2rem .55rem; font-size: .8rem; border-radius: 2px }
+
+.chatbox { display: flex; flex-direction: column; border: 1px solid var(--line); border-left: 0; border-right: 0; background: #fafafa; height: 40vh; min-height: 220px; box-shadow: inset 0 1px 3px rgba(0,0,0,.06) }
+@media (min-width: 721px) { .chatbox { border: 1px solid var(--line); height: auto; min-height: 280px; max-height: 420px } }
+.msgs { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: .6rem .7rem; font-size: .92rem }
+.msg { margin-bottom: .35rem; overflow-wrap: anywhere }
+.msg.me b { color: var(--you) }
+.pav { display: inline-block; width: 18px; height: 18px; border-radius: 50%; vertical-align: -4px; margin-right: 5px; border: 1px solid rgba(255,255,255,.6); object-fit: cover }
+.msg.peer b { color: var(--stranger) }
+.msg.sys { color: var(--dim); font-style: italic; font-size: .8rem }
+.say { display: flex; border-top: 1px solid var(--line); background: #fff }
+.say input { border: 0; border-radius: 0; flex: 1; box-shadow: none; min-width: 0 }
+.say input:focus { box-shadow: inset 0 0 0 2px var(--red) }
+.say button { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; border: 0; border-left: 1px solid var(--line); background: linear-gradient(#f7f7f7, #e2e2e2); padding: 0 1.1rem; font-weight: 700; text-shadow: 0 1px 0 #fff; min-width: 72px }
+.say button:disabled { opacity: .5 }
+
+/* ---------- admin ---------- */
+.tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch }
+table.tbl { width: 100%; min-width: 640px; border-collapse: collapse; font-size: .8rem }
+.tbl th, .tbl td { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; border: 1px solid var(--line-2); padding: .4rem .5rem; text-align: left; vertical-align: top }
+.tbl th { background: linear-gradient(#e8e8e8, #d4d4d4); text-shadow: 0 1px 0 #fff }
+.tbl td .btn { margin: 0 .25rem .25rem 0 }
+.tbl pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: .76rem; color: var(--mut) }
+
+/* ---------- footer & dokumen ---------- */
+footer.bottom { font-family: Verdana, Tahoma, 'DejaVu Sans', Geneva, sans-serif; text-align: center; font-size: .76rem; color: var(--dim); padding: 1rem .7rem calc(1.2rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-2); background: #ececec }
+footer.bottom a { margin: 0 .4rem; display: inline-block; min-height: 28px; line-height: 28px }
+.doc p, .doc li { font-size: .9rem; margin-bottom: .6rem; color: var(--mut) }
+.doc ul { margin: 0 0 .8rem 1.3rem }
+.doc h2 { margin-top: 1rem }

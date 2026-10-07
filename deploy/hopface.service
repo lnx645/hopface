@@ -1,0 +1,38 @@
+[Unit]
+Description=Hopface random video chat (port 8868)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hopface
+Group=hopface
+WorkingDirectory=/var/lib/hopface
+# hopface.env wajib; turn.env dan google.env opsional (tanda '-' = abaikan bila tidak ada).
+# Dibaca oleh systemd sebagai root sebelum hak akses diturunkan, jadi cukup berizin 600 milik root.
+EnvironmentFile=/etc/project-app1/hopface.env
+EnvironmentFile=-/etc/project-app1/turn.env
+EnvironmentFile=-/etc/project-app1/google.env
+ExecStart=/opt/hopface/hopface
+Restart=always
+RestartSec=2
+
+# Mesin ini RAM-nya sempit (sebagian dipinjam balloon): batasi agar tidak mengganggu layanan lain.
+MemoryMax=300M
+LimitNOFILE=65536
+
+# Pengerasan
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/hopface
+
+[Install]
+WantedBy=multi-user.target

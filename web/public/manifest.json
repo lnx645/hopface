@@ -1,0 +1,13 @@
+{
+  "name": "Hopface — Random Video Chat",
+  "short_name": "Hopface",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#e4e4e4",
+  "theme_color": "#cc0000",
+  "icons": [
+    { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
