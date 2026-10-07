@@ -68,12 +68,17 @@ func TestStoresPersist(t *testing.T) {
 	ms, _ := NewModerationStore(dir)
 	_ = ms.SaveBan(domain.Ban{UserID: "x", Reason: "r"})
 	_ = ms.SaveReport(domain.Report{ID: "1", ReporterID: "a", ReportedID: "x"})
+	_ = ms.SaveReport(domain.Report{ID: "2", ReporterID: "b", ReportedID: "y", Frame: "data:image/jpeg;base64,AAAA"})
 	ms2, _ := NewModerationStore(dir)
-	if _, ok := ms2.GetBan("x"); !ok || len(ms2.Reports()) != 1 {
+	if _, ok := ms2.GetBan("x"); !ok || len(ms2.Reports()) != 2 {
 		t.Fatal("ban dan laporan harus bertahan")
 	}
 	if err := ms2.MarkHandled("1"); err != nil || !ms2.Reports()[0].Handled {
 		t.Fatal("MarkHandled gagal")
+	}
+	// Saat laporan ditangani, bukti frame otomatis dihapus agar tidak menumpuk di disk.
+	if err := ms2.MarkHandled("2"); err != nil || ms2.Reports()[1].Handled == false || ms2.Reports()[1].Frame != "" {
+		t.Fatalf("frame laporan ditangani harus dibersihkan: %+v", ms2.Reports()[1])
 	}
 	if err := ms2.RemoveBan("x"); err != nil {
 		t.Fatal(err)

@@ -21,7 +21,8 @@ type Report struct {
 	ReporterID string    `json:"reporterId"`
 	ReportedID string    `json:"reportedId"`
 	Reason     string    `json:"reason"`
-	Transcript []string  `json:"transcript"` // pesan teks terakhir, hanya disimpan bila dilaporkan
+	Transcript []string  `json:"transcript"`          // pesan teks terakhir, hanya disimpan bila dilaporkan
+	Frame      string    `json:"frame,omitempty"`     // foto frame video pasangan saat dilaporkan (data URL JPEG)
 	At         time.Time `json:"at"`
 	Handled    bool      `json:"handled"`
 }

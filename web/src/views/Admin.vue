@@ -34,12 +34,14 @@ onMounted(load)
     <p v-if="!reports.length && !error" class="muted">No reports yet.</p>
     <div class="tbl-wrap">
       <table v-if="reports.length" class="tbl">
-        <thead><tr><th>When</th><th>Reported user</th><th>Reason</th><th>Last messages</th><th>Actions</th></tr></thead>
+        <thead><tr><th>When</th><th>Reported user</th><th>Reason</th><th>Evidence</th><th>Last messages</th><th>Actions</th></tr></thead>
         <tbody>
           <tr v-for="r in reports" :key="r.id" :style="r.handled ? 'opacity:.5' : ''">
             <td>{{ fmt(r.at) }}</td>
             <td>{{ r.reportedId }}<br><span class="muted">by {{ r.reporterId }}</span></td>
             <td>{{ r.reason }}</td>
+            <td><img v-if="r.frame" class="evidence" :src="r.frame" alt="Reported frame" loading="lazy">
+                <span v-else class="muted">—</span></td>
             <td><pre>{{ (r.transcript || []).join('\n') || '—' }}</pre></td>
             <td>
               <button class="btn small" type="button" @click="ban(r, 24)">Ban 24h</button>
@@ -52,3 +54,8 @@ onMounted(load)
     </div>
   </div>
 </template>
+
+<style>
+/* Bukti frame laporan: thumbnail 2013, klik untuk melihat ukuran asli. */
+.evidence { width: 96px; height: auto; border: 1px solid var(--line-2); box-shadow: 0 1px 2px rgba(0,0,0,.15); cursor: pointer }
+</style>

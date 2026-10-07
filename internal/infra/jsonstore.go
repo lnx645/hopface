@@ -146,12 +146,14 @@ func (s *ModerationStore) Reports() []domain.Report {
 }
 
 // MarkHandled implementasi domain.ModerationRepository.
+// Begitu laporan ditangani moderator, bukti frame dihapus agar penyimpanan tidak menumpuk.
 func (s *ModerationStore) MarkHandled(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.d.Reports {
 		if s.d.Reports[i].ID == id {
 			s.d.Reports[i].Handled = true
+			s.d.Reports[i].Frame = ""
 			return s.flush()
 		}
 	}

@@ -414,7 +414,7 @@ func TestReportMovesOnAndAutoBans(t *testing.T) {
 			t.Fatalf("%s harus cocok dengan bad", id)
 		}
 		l.Chat(bad.id, "pesan buruk dari "+id)
-		if err := l.Report(r.id, "kasar"); err != nil {
+		if err := l.Report(r.id, "kasar", "data:image/jpeg;base64,AAAA"); err != nil {
 			t.Fatal(err)
 		}
 		if r.state() != StateSearching {
@@ -427,6 +427,9 @@ func TestReportMovesOnAndAutoBans(t *testing.T) {
 	}
 	if len(rs[0].Transcript) == 0 || rs[0].Transcript[0] != "peer: pesan buruk dari r1" {
 		t.Fatalf("transkrip harus berisi pesan terakhir, got %v", rs[0].Transcript)
+	}
+	if rs[0].Frame != "data:image/jpeg;base64,AAAA" {
+		t.Fatalf("frame bukti harus ikut tersimpan, got %q", rs[0].Frame)
 	}
 	if _, banned := mod.IsBanned("bad"); !banned {
 		t.Fatal("3 pelapor berbeda harus memicu blokir otomatis")

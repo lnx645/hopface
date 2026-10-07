@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { store, api, loadMe } from '../store'
 import { countries } from '../countries'
+import CustomSelect from './CustomSelect.vue'
 
 const emit = defineEmits(['done'])
 
@@ -9,6 +10,13 @@ const me = computed(() => store.me)
 const user = computed(() => me.value.user || {})
 
 // Tanggal lahir terbaru yang masih sah (hari ini - 18 tahun) dipakai sebagai batas input.
+const genderOptions = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
+const countryOptions = countries.map((c) => ({ value: c.code, label: c.name }))
+
 const latest = (() => {
   const d = new Date()
   d.setFullYear(d.getFullYear() - 18)
@@ -30,6 +38,9 @@ const avatarBusy = ref(false)
 const isNew = computed(() => !user.value.profileComplete)
 const canSave = computed(() => name.value.trim() && gender.value && country.value && adult.value && !busy.value)
 const preview = computed(() => me.value.avatar || '/avatar/default.svg')
+// Selama mengunggah, pratinjau diganti gif pemuat gaya 2013 (sesuai gaya AnyDown).
+const previewShown = computed(() => avatarBusy.value ? '/img/ajax-loader.gif' : preview.value + (bust.value ? '?v=' + bust.value : ''))
+const bust = ref(0)
 
 const MESSAGES = { underage: 'You must be at least 18 years old.', invalid_profile: 'Please check your details.', invalid_image: 'That file is not a valid image.' }
 
@@ -52,10 +63,46 @@ async function emitDone() {
   emit('done')
 }
 
-function onFileChange(e) {
-  file.value = e.target.files && e.target.files[0]
+async function onFileChange(e) {
+  const f = e.target.files && e.target.files[0]
   okMsg.value = ''
   error.value = ''
+  if (!f) { file.value = null; fileSize.value = ''; return }
+  // Gambar diperkecil di HP/browser dulu (maks 256px sisi terpanjang) supaya unggahan kecil.
+  try {
+    const small = await resizeImage(f, 256)
+    file.value = small
+    fileSize.value = `Resized to ${small.size < 1024 ? small.size + ' B' : Math.round(small.size / 1024) + ' KB'} · ready to upload`
+  } catch {
+    file.value = f
+    fileSize.value = `${Math.round(f.size / 1024)} KB · ready to upload`
+  }
+}
+
+const fileSize = ref('')
+
+// Mengecilkan gambar ke sisi terpanjang max, lalu diubah ke JPEG kualitas 0.85.
+function resizeImage(file, max) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, max / Math.max(img.width, img.height))
+        const c = document.createElement('canvas')
+        c.width = Math.max(1, Math.round(img.width * scale))
+        c.height = Math.max(1, Math.round(img.height * scale))
+        const ctx = c.getContext('2d')
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        c.toBlob((blob) => {
+          if (!blob) return reject(new Error('toBlob failed'))
+          const name = file.name.replace(/\.[^.]+$/, '') + '.jpg'
+          resolve(new File([blob], name, { type: 'image/jpeg' }))
+        }, 'image/jpeg', 0.85)
+      } catch (err) { reject(err) }
+    }
+    img.onerror = () => reject(new Error('cannot read image'))
+    img.src = URL.createObjectURL(file)
+  })
 }
 
 async function upload() {
@@ -67,7 +114,7 @@ async function upload() {
     const r = await fetch('/api/profile/avatar', { method: 'POST', body: fd, credentials: 'same-origin' })
     avatarBusy.value = false
     const data = await r.json().catch(() => null)
-    if (r.ok) { okMsg.value = 'Avatar updated.'; file.value = null; if (fileInput.value) fileInput.value.value = ''; await emitDone() }
+    if (r.ok) { okMsg.value = 'Avatar updated.'; file.value = null; if (fileInput.value) fileInput.value.value = ''; bust.value = Date.now(); await emitDone() }
     else error.value = MESSAGES[data && data.error] || 'Upload failed. Use a JPEG/PNG image up to 2MB.'
   } catch {
     avatarBusy.value = false
@@ -79,7 +126,7 @@ async function resetAvatar() {
   avatarBusy.value = true
   const r = await api('POST', '/api/profile/avatar/reset')
   avatarBusy.value = false
-  if (r.ok) { okMsg.value = 'Avatar reset to Google/default.'; await emitDone() }
+  if (r.ok) { okMsg.value = 'Avatar reset to Google/default.'; bust.value = Date.now(); await emitDone() }
 }
 </script>
 
@@ -89,13 +136,14 @@ async function resetAvatar() {
     <p class="lede">{{ isNew ? 'Hello ' + user.name + '! A few details and then you can start.' : 'Update your name, photo, and settings.' }}</p>
 
     <div class="ava-row">
-      <img class="ava-lg" :src="preview" alt="Your avatar" width="72" height="72">
+      <img class="ava-lg" :class="{ loading: avatarBusy }" :src="previewShown" alt="Your avatar" width="72" height="72">
       <div>
         <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" @change="onFileChange" style="display:none">
         <button class="btn small" type="button" @click="fileInput.click()">Choose photo</button>
-        <button v-if="file" class="btn green small" type="button" :disabled="avatarBusy" @click="upload">Upload</button>
+        <button v-if="file" class="btn green small" type="button" :disabled="avatarBusy" @click="upload">{{ avatarBusy ? 'Uploading…' : 'Upload' }}</button>
         <button v-if="user.avatarCustom" class="btn small" type="button" :disabled="avatarBusy" @click="resetAvatar">Use Google avatar</button>
         <p class="muted">JPEG, PNG, GIF or WebP, maximum 2MB.</p>
+        <p v-if="fileSize" class="muted" style="color:var(--green);font-weight:700">{{ fileSize }}</p>
       </div>
     </div>
 
@@ -109,20 +157,12 @@ async function resetAvatar() {
         <input id="nm" type="text" v-model="name" maxlength="60" required>
       </div>
       <div class="field">
-        <label for="g">I am</label>
-        <select id="g" v-model="gender" required>
-          <option value="" disabled>Select…</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
-        </select>
+        <label>I am</label>
+        <CustomSelect v-model="gender" :options="genderOptions" label="Select…" />
       </div>
       <div class="field">
-        <label for="c">Country</label>
-        <select id="c" v-model="country" required>
-          <option value="" disabled>Select…</option>
-          <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
-        </select>
+        <label>Country</label>
+        <CustomSelect v-model="country" :options="countryOptions" label="Select…" />
       </div>
       <div class="field">
         <label v-if="user.birthdate">Date of birth (locked)</label>
@@ -148,4 +188,5 @@ async function resetAvatar() {
 <style scoped>
 .ava-row { display: flex; gap: 1rem; align-items: center; margin: 1rem auto; max-width: 440px; flex-wrap: wrap; justify-content: center }
 .ava-lg { border-radius: 50%; border: 2px solid var(--line); object-fit: cover; background: #eee }
+.ava-lg.loading { object-fit: contain; padding: 8px; background: #fafafa; }
 </style>

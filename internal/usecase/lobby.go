@@ -236,7 +236,7 @@ func (l *Lobby) Signal(connID string, data json.RawMessage) {
 }
 
 // Report melaporkan pasangan saat ini, lalu langsung pindah ke pasangan berikutnya.
-func (l *Lobby) Report(connID, reason string) error {
+func (l *Lobby) Report(connID, reason, frame string) error {
 	if l.mod == nil {
 		return errors.New("moderasi tidak aktif")
 	}
@@ -246,11 +246,16 @@ func (l *Lobby) Report(connID, reason string) error {
 		l.mu.Unlock()
 		return errors.New("tidak sedang terhubung")
 	}
+	// Bukti foto: batasi ukuran supaya penyimpanan moderasi tidak meledak.
+	if len(frame) > 400_000 {
+		frame = ""
+	}
 	r := domain.Report{
 		ReporterID: s.user.ID,
 		ReportedID: s.partner.user.ID,
 		Reason:     reason,
 		Transcript: append([]string(nil), s.chat...),
+		Frame:      frame,
 	}
 	l.mu.Unlock()
 

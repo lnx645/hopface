@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	wsReadLimit   = 16 << 10 // cukup untuk SDP; mencegah pesan raksasa
+	wsReadLimit   = 512 << 10 // cukup untuk SDP dan bukti frame laporan (JPEG data URL); tetap membatasi pesan raksasa
 	wsPongWait    = 60 * time.Second
 	wsPingEvery   = 25 * time.Second
 	wsWriteWait   = 10 * time.Second
@@ -87,6 +88,7 @@ type clientMsg struct {
 	Text   string          `json:"text"`
 	Data   json.RawMessage `json:"data"`
 	Reason string          `json:"reason"`
+	Frame  string          `json:"frame"` // data URL JPEG, frame video pasangan saat dilaporkan
 }
 
 func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
@@ -134,9 +136,10 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 		case "signal":
 			s.Lobby.Signal(c.id, m.Data)
 		case "report":
-			if err := s.Lobby.Report(c.id, m.Reason); err != nil {
+			if err := s.Lobby.Report(c.id, m.Reason, m.Frame); err != nil {
 				c.Send(usecase.Event{T: "error", Error: "report_failed"})
 			} else {
+				log.Printf("laporan diterima: alasan=%q frame=%d byte", m.Reason, len(m.Frame))
 				c.Send(usecase.Event{T: "reported"})
 			}
 		}

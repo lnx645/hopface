@@ -1,9 +1,21 @@
 <script setup>
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import CustomSelect from './CustomSelect.vue'
 import { connectSocket } from '../socket'
+import { store } from '../store'
 import { createCall } from '../rtc'
 import { api } from '../store'
 import { countries, flag, countryName } from '../countries'
+
+const genderFilterOptions = [
+  { value: '', label: 'Anyone' },
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'other', label: 'Other' },
+]
+const countryFilterOptions = [{ value: '', label: 'Anywhere' }, ...countries.map((c) => ({ value: c.code, label: c.name }))]
+const reportOptions = computed(() => REASONS.map((r) => ({ value: r, label: r })))
+const pct = (v) => Math.round(((Math.min(99, Math.max(18, +v || 18)) - 18) / 81) * 100) + '%'
 
 const RELAX_MS = 10000 // harus sama dengan batas di server (Matchmaker.RelaxAfter)
 
@@ -41,6 +53,8 @@ let callPromise = null
 let callToken = 0
 let iceCache = null
 let timer = null
+let snapTimer = null
+let lastFrame = '' // frame video pasangan terakhir, jaringan pengaman bila video sempat tak siap saat lapor
 
 const REASONS = ['Nudity or sexual content', 'Harassment or abuse', 'Appears to be under 18', 'Spam or advertising', 'Other']
 const ERRORS = {
@@ -54,6 +68,9 @@ const ERRORS = {
 const GENDER_LABEL = { '': 'Anyone', female: 'Female', male: 'Male', other: 'Other' }
 
 const busy = computed(() => state.value !== 'idle')
+// Di HP, saat mengetik pesan kunci tombol Next/Stop supaya tidak salah kepencet pengganti Send.
+const mobileTypingLock = computed(() => !wide.matches && state.value === 'chatting' && draft.value.trim() !== '')
+const meAvatar = computed(() => (store.me && store.me.avatar) || '/avatar/default.svg')
 const relaxed = computed(() => state.value === 'searching' && now.value - searchSince.value >= RELAX_MS)
 const secs = computed(() => Math.max(0, Math.floor((now.value - searchSince.value) / 1000)))
 // Ringkasan filter yang tampil di judul panel saat dilipat.
@@ -152,15 +169,20 @@ function onEvent(e) {
         searchSince.value = Date.now()
         peer.value = null
         stopCall()
+        msgs.value = [] // mulai pencarian baru: riwayat chat lama dihapus
+        lastFrame = ''  // frame pasangan sebelumnya dibuang, tidak boleh terbawa ke match berikutnya
       } else if (e.state === 'idle') {
         peer.value = null
         stopCall()
+        msgs.value = [] // Stop ditekan: riwayat chat ikut hilang
+        lastFrame = ''  // selesai sesi: frame sementara langsung dihapus
       }
       break
     case 'matched':
       state.value = 'chatting'
       peer.value = e.peer
       msgs.value = []
+      lastFrame = '' // bukti frame milik pasangan sebelumnya tidak boleh tercampur
       reportSent.value = false
       showReport.value = false
       videoFailed.value = false
@@ -170,6 +192,7 @@ function onEvent(e) {
     case 'partner_left':
       stopCall()
       peer.value = null
+      lastFrame = '' // orang sudah selesai: frame sementara langsung dibuang
       showReport.value = false
       videoFailed.value = false
       sys('Your partner has left the chat.')
@@ -231,8 +254,28 @@ function say() {
   draft.value = ''
 }
 
+// Ambil satu frame video pasangan sebagai bukti laporan (data URL JPEG kecil).
+function grabFrame() {
+  try {
+    const v = remoteEl.value
+    if (!v || !v.videoWidth || !v.videoHeight) return ''
+    const c = document.createElement('canvas')
+    const render = (w, quality) => {
+      c.width = w
+      c.height = Math.round((v.videoHeight * w) / v.videoWidth)
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height)
+      return c.toDataURL('image/jpeg', quality)
+    }
+    let url = render(320, 0.55)
+    if (url.length > 400_000) url = render(240, 0.4) // sesuai batas server (Lobby.Report)
+    return url.length > 400_000 ? '' : url
+  } catch {
+    return '' // video belum siap / diblokir browser: laporan tetap terkirim tanpa bukti
+  }
+}
+
 function sendReport() {
-  sock.send({ t: 'report', reason: reportReason.value })
+  sock.send({ t: 'report', reason: reportReason.value, frame: grabFrame() || lastFrame })
   showReport.value = false
 }
 
@@ -243,10 +286,15 @@ onMounted(() => {
   } catch { /* abaikan filter tersimpan yang rusak */ }
   sock = connectSocket({ onEvent, onStatus: (s) => { link.value = s; if (s === 'closed') { state.value = 'idle'; peer.value = null; stopCall() } } })
   timer = setInterval(() => { now.value = Date.now() }, 1000)
+  // Ambil frame pasangan berkala selama chat supaya bukti selalu ada saat laporan dikirim.
+  snapTimer = setInterval(() => {
+    if (state.value === 'chatting') { const f = grabFrame(); if (f) lastFrame = f }
+  }, 5000)
 })
 
 onBeforeUnmount(() => {
   clearInterval(timer)
+  clearInterval(snapTimer)
   stopCall()
   stopMedia()
   if (sock) sock.close()
@@ -261,32 +309,22 @@ onBeforeUnmount(() => {
     <details class="card fbox" :open="filtersOpen" @toggle="filtersOpen = $event.target.open">
       <summary>
         Who do you want to meet?
+        <span class="hint">tap to change</span>
         <span class="sum">{{ filterSummary }}</span>
       </summary>
       <div class="filters">
         <div class="field">
-          <label for="fg">Gender</label>
-          <select id="fg" v-model="filter.gender" :disabled="busy">
-            <option value="">Anyone</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-            <option value="other">Other</option>
-          </select>
+          <label>Gender</label>
+          <CustomSelect v-model="filter.gender" :options="genderFilterOptions" :disabled="busy" />
         </div>
         <div class="field">
-          <label for="fc">Country</label>
-          <select id="fc" v-model="filter.country" :disabled="busy">
-            <option value="">Anywhere</option>
-            <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
-          </select>
+          <label>Country</label>
+          <CustomSelect v-model="filter.country" :options="countryFilterOptions" :disabled="busy" />
         </div>
-        <div class="field">
-          <label for="fa">Age from</label>
-          <input id="fa" type="number" inputmode="numeric" min="18" max="99" v-model.number="filter.minAge" :disabled="busy">
-        </div>
-        <div class="field">
-          <label for="fb">Age to</label>
-          <input id="fb" type="number" inputmode="numeric" min="18" max="99" v-model.number="filter.maxAge" :disabled="busy">
+        <div class="field wide">
+          <label>Age: <b>{{ filter.minAge }} – {{ filter.maxAge }}</b></label>
+          <input type="range" :style="{ '--p': pct(filter.minAge) }" v-model.number="filter.minAge" min="18" max="99" :disabled="busy" aria-label="Age from" @input="filter.minAge > filter.maxAge && (filter.maxAge = filter.minAge)">
+          <input type="range" :style="{ '--p': pct(filter.maxAge) }" v-model.number="filter.maxAge" min="18" max="99" :disabled="busy" aria-label="Age to" @input="filter.maxAge < filter.minAge && (filter.minAge = filter.maxAge)">
         </div>
         <div class="field wide">
           <label class="check"><input type="checkbox" v-model="textOnly" :disabled="busy"> Text chat only (no camera or microphone)</label>
@@ -298,29 +336,43 @@ onBeforeUnmount(() => {
       <div class="videos">
         <video ref="remoteEl" class="remote" autoplay playsinline></video>
         <video ref="localEl" class="local" autoplay playsinline muted v-show="!textOnly"></video>
-        <div v-if="peer" class="peer"><img class="pav" :src="peer.picture" alt="" width="18" height="18">{{ flag(peer.country) }} {{ peer.name }}, {{ peer.age }}</div>
 
         <div v-if="state === 'idle'" class="overlay">
+          <img v-if="link !== 'open'" class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
           <b>{{ link === 'open' ? 'Press Start to find someone' : 'Connecting…' }}</b>
         </div>
         <div v-else-if="state === 'searching'" class="overlay">
-          <span class="spin"></span>
+          <img class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
           <b>Looking for someone…</b>
           <span v-if="!relaxed">Matching your filter ({{ secs }}s)</span>
           <span v-else>No exact match yet, so we are now matching you with anyone.</span>
           <span>{{ waiting }} waiting</span>
         </div>
         <div v-else-if="state === 'chatting' && videoFailed" class="overlay">
-          <b>Video connection failed</b>
-          <span>Your chat partner may not have a camera, or the browser blocked it. You can still chat in text, or press <b>Next</b>.</span>
+          <img class="pav-lg" v-if="peer" :src="peer.picture" alt="Partner avatar" width="72" height="72">
+          <b v-if="peer">{{ peer.name }}, {{ peer.age }} · {{ countryName(peer.country) }}</b>
+          <b style="margin-top:.5rem">Video connection failed</b>
+          <span>You can still chat in text, or press <b>Next</b>.</span>
         </div>
         <div v-else-if="state === 'chatting' && !remoteReady" class="overlay">
-          <span class="spin"></span>
+          <img class="pav-lg" v-if="peer" :src="peer.picture" alt="Partner avatar" width="72" height="72">
+          <b v-if="peer">{{ peer.name }}, {{ peer.age }}</b>
+          <span v-if="peer">{{ flag(peer.country) }} {{ countryName(peer.country) }}</span>
+          <img class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
           <span>Connecting video… you can still chat in text. If the other side also has “text chat only”, no video will stream.</span>
         </div>
       </div>
 
       <div class="chatbox">
+        <div class="peerbar">
+          <img class="pav" :src="meAvatar" alt="You" width="20" height="20"> <b class="you">You</b>
+          <span class="arrow">⇄</span>
+          <template v-if="peer">
+            <img class="pav" :src="peer.picture" alt="" width="20" height="20"> <b>{{ peer.name }}, {{ peer.age }}</b>
+            <span class="country">{{ flag(peer.country) }} {{ countryName(peer.country) }}</span>
+          </template>
+          <span v-else class="country">No partner yet</span>
+        </div>
         <div ref="msgsEl" class="msgs" aria-live="polite">
           <div v-if="!msgs.length" class="msg sys">Messages will appear here.</div>
           <div v-for="(m, i) in msgs" :key="i" class="msg" :class="m.k">
@@ -339,10 +391,8 @@ onBeforeUnmount(() => {
     <!-- Bilah aksi: menempel di dasar layar pada HP, di bawah filter pada layar lebar -->
     <div class="dock">
       <div v-if="showReport" class="banner info">
-        <label for="rr">Why are you reporting this person?</label>
-        <select id="rr" v-model="reportReason" style="margin-bottom:.5rem">
-          <option v-for="r in REASONS" :key="r" :value="r">{{ r }}</option>
-        </select>
+        <label>Why are you reporting this person?</label>
+        <CustomSelect v-model="reportReason" :options="reportOptions" style="margin-bottom:.5rem" />
         <div class="row">
           <button class="btn red small" type="button" @click="sendReport">Send report and skip</button>
           <button class="btn small" type="button" @click="showReport = false">Cancel</button>
@@ -351,12 +401,12 @@ onBeforeUnmount(() => {
       <div class="row">
         <button v-if="state === 'idle'" class="btn green big" type="button" :disabled="link !== 'open'" @click="start"><i class="icon-play"></i> Start</button>
         <template v-else>
-          <button v-if="state === 'chatting'" class="btn green big" type="button" @click="next"><i class="icon-forward"></i> Next</button>
-          <button class="btn red big" type="button" @click="stop"><i class="icon-stop"></i> Stop</button>
+          <button v-if="state === 'chatting'" class="btn green big" type="button" :disabled="mobileTypingLock" @click="next"><i class="icon-forward"></i> Next</button>
+          <button class="btn red big" type="button" :disabled="mobileTypingLock" @click="stop"><i class="icon-stop"></i> Stop</button>
           <button v-if="state === 'chatting'" class="btn" type="button" :disabled="reportSent" @click="showReport = !showReport"><i class="icon-flag"></i> Report</button>
         </template>
         <span class="status">
-          <template v-if="link !== 'open'">Connecting to server…</template>
+          <template v-if="link !== 'open'"><img src="/img/ajax-loader.gif" alt="" width="14" height="14" style="vertical-align:-3px;margin-right:4px">Connecting to server…</template>
           <span v-else class="online"><b>{{ online }}</b> online now</span>
         </span>
       </div>

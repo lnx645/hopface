@@ -53,7 +53,7 @@ function onProfileDone() { loadMe() }
 
   <main>
     <div class="shell">
-      <div v-if="store.loading" class="card center muted">Loading…</div>
+      <div v-if="store.loading" class="card center muted"><img src="/img/ajax-loader.gif" alt="" width="28" height="28" style="margin:0 auto .4rem">Loading…</div>
       <div v-else-if="store.failed" class="card center">
         <p class="err">Could not reach the server.</p>
         <button class="btn" type="button" @click="loadMe">Try again</button>
