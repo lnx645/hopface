@@ -87,6 +87,23 @@ func run() error {
 	lobby := usecase.NewLobby(matchmaker, moderation, nil)
 	moderation.OnBan = lobby.Kick
 
+	// Fitur Cari: lokasi kasar dari IP (mode dev memakai lokasi tetap Jakarta),
+	// penyimpanan status/teman/pesan, dan unggahan gambar.
+	if dev {
+		accounts.SetGeoResolver(infra.DevGeo{})
+	} else {
+		accounts.SetGeoResolver(infra.NewGeoLookup())
+	}
+	socialStore, err := infra.NewSocialStore(dataDir)
+	if err != nil {
+		return err
+	}
+	uploadStore, err := infra.NewUploadStore(dataDir)
+	if err != nil {
+		return err
+	}
+	social := usecase.NewSocial(users, socialStore, nil)
+
 	static, err := web.Dist()
 	if err != nil {
 		return err
@@ -94,8 +111,8 @@ func run() error {
 	handler := delivery.New(delivery.Deps{
 		Cfg: delivery.Config{Addr: addr, BaseURL: baseURL, Dev: dev, AdminEmails: admins,
 			SecureCookie: strings.HasPrefix(baseURL, "https://")},
-		Accounts: accounts, Moderation: moderation, Lobby: lobby,
-		Signer: signer, Identity: google, ICE: turn, Static: static, Avatar: avatarStore,
+		Accounts: accounts, Moderation: moderation, Lobby: lobby, Social: social,
+		Signer: signer, Identity: google, ICE: turn, Static: static, Avatar: avatarStore, Uploads: uploadStore,
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

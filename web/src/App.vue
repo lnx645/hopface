@@ -5,6 +5,7 @@ import { store, loadMe, logout } from './store'
 import Landing from './views/Landing.vue'
 import Profile from './views/Profile.vue'
 import Chat from './views/Chat.vue'
+import Cari from './views/Cari.vue'
 import Admin from './views/Admin.vue'
 import Terms from './views/Terms.vue'
 import Privacy from './views/Privacy.vue'
@@ -23,6 +24,7 @@ const view = computed(() => {
   if (me.value.banned) return Landing
   // Profil selalu bisa dibuka; bila belum lengkap, ini juga dipaksa dulu saat route '/'.
   if (p === '/profile' || !me.value.profileComplete) return Profile
+  if (p === '/cari') return Cari
   if (p === '/admin' && me.value.admin) return Admin
   return Chat
 })
@@ -40,6 +42,7 @@ function onProfileDone() { loadMe() }
         <a href="/terms" @click.prevent="go('/terms')"><i class="icon-file-alt"></i> Terms</a>
         <a href="/privacy" @click.prevent="go('/privacy')"><i class="icon-lock"></i> Privacy</a>
         <template v-if="me && me.authenticated">
+          <a href="/cari" @click.prevent="go('/cari')"><i class="icon-search"></i> Cari</a>
           <a v-if="me.admin" href="/admin" @click.prevent="go('/admin')"><i class="icon-cog"></i> Admin</a>
           <span class="who">{{ me.user.name }}</span>
           <button class="link" type="button" @click="logout"><i class="icon-signout"></i> Sign out</button>
@@ -69,6 +72,7 @@ function onProfileDone() { loadMe() }
     <nav class="snav">
       <a href="/" @click.prevent="go('/'); sheet = false"><i class="icon-home"></i> Home</a>
       <a href="/profile" @click.prevent="go('/profile'); sheet = false"><i class="icon-user"></i> Profile</a>
+      <a href="/cari" @click.prevent="go('/cari'); sheet = false"><i class="icon-search"></i> Cari</a>
       <a href="/terms" @click.prevent="go('/terms'); sheet = false"><i class="icon-file-alt"></i> Terms</a>
       <a href="/privacy" @click.prevent="go('/privacy'); sheet = false"><i class="icon-lock"></i> Privacy</a>
       <template v-if="me && me.authenticated">

@@ -72,6 +72,17 @@ func (s *UserStore) Save(u domain.User) error {
 	return writeJSON(s.path, s.users)
 }
 
+// All implementasi domain.UserRepository (salinan seluruh pengguna).
+func (s *UserStore) All() []domain.User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]domain.User, 0, len(s.users))
+	for _, u := range s.users {
+		out = append(out, u)
+	}
+	return out
+}
+
 type modData struct {
 	Bans    map[string]domain.Ban `json:"bans"`
 	Reports []domain.Report       `json:"reports"`

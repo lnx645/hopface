@@ -31,6 +31,7 @@ type Report struct {
 type UserRepository interface {
 	Get(id string) (User, error)
 	Save(u User) error
+	All() []User // seluruh pengguna, dipakai listing Cari
 }
 
 // ModerationRepository menyimpan blokir dan laporan.

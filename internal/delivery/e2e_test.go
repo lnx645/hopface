@@ -21,6 +21,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"hopface/internal/domain"
 	"hopface/internal/infra"
 	"hopface/internal/usecase"
 )
@@ -58,6 +59,8 @@ type env struct {
 	repo     *infra.ModerationStore
 	accounts *usecase.Accounts
 	signer   *infra.Signer
+	users    *infra.UserStore
+	social   *usecase.Social
 }
 
 func newEnv(t *testing.T) *env {
@@ -71,6 +74,9 @@ func newEnv(t *testing.T) *env {
 	mm := usecase.NewMatchmaker(10*time.Second, 30*time.Second, nil)
 	lob := usecase.NewLobby(mm, mod, nil)
 	mod.OnBan = lob.Kick
+	socialStore, _ := infra.NewSocialStore(dir)
+	uploadStore, _ := infra.NewUploadStore(dir)
+	social := usecase.NewSocial(users, socialStore, nil)
 	static := fstest.MapFS{
 		"index.html":           {Data: []byte("<html>SPA</html>")},
 		"assets/app-abc.js":    {Data: []byte("console.log(1)")},
@@ -80,13 +86,13 @@ func newEnv(t *testing.T) *env {
 	accounts := usecase.NewAccounts(users, avatarStore, nil)
 	h := New(Deps{
 		Cfg:      Config{Dev: true, AdminEmails: map[string]bool{"admin@example.com": true}},
-		Accounts: accounts, Moderation: mod, Lobby: lob,
+		Accounts: accounts, Moderation: mod, Lobby: lob, Social: social,
 		Signer: signer, Identity: fakeIdentity{infra.Identity{Sub: "1", Email: "g@example.com", EmailVerified: true, Name: "Gina Test"}},
-		ICE: fakeICE{}, Static: static, Avatar: avatarStore,
+		ICE: fakeICE{}, Static: static, Avatar: avatarStore, Uploads: uploadStore,
 	})
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &env{srv: srv, mod: mod, lob: lob, repo: repo, accounts: accounts, signer: signer}
+	return &env{srv: srv, mod: mod, lob: lob, repo: repo, accounts: accounts, signer: signer, users: users, social: social}
 }
 
 type client struct {
@@ -132,6 +138,37 @@ func (c *client) ready(email, gender, country string) {
 	if code, body := c.profile("1995-03-04", gender, country); code != 200 {
 		c.t.Fatalf("profil %s: %d %s", email, code, body)
 	}
+}
+
+// doMultipart mengirim request multipart/form-data (dipakai unggahan status & chat).
+func (c *client) doMultipart(method, path string, fields map[string]string, fileField, fileName string, fileData []byte) (int, string) {
+	c.t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		if err := w.WriteField(k, v); err != nil {
+			c.t.Fatal(err)
+		}
+	}
+	if fileField != "" {
+		part, err := w.CreateFormFile(fileField, fileName)
+		if err != nil {
+			c.t.Fatal(err)
+		}
+		if _, err := part.Write(fileData); err != nil {
+			c.t.Fatal(err)
+		}
+	}
+	w.Close()
+	req, _ := http.NewRequest(method, c.e.srv.URL+path, &buf)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	res, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return res.StatusCode, string(b)
 }
 
 type wsc struct {
@@ -614,4 +651,116 @@ func TestAvatarUploadAndReset(t *testing.T) {
 		t.Fatalf("bukan gambar harus 400, got %d", res2.StatusCode)
 	}
 	res2.Body.Close()
+}
+
+// ---- fitur Cari ----
+
+// setGeo memberi lokasi kasar pengguna secara manual (e2e tidak memakai geo resolver).
+func (e *env) setGeo(t *testing.T, uid, city string, lat, lon float64) {
+	t.Helper()
+	u, err := e.users.Get(uid)
+	if err != nil {
+		t.Fatalf("Get %s: %v", uid, err)
+	}
+	u.Geo = &domain.Geo{City: city, Lat: lat, Lon: lon, At: time.Now()}
+	if err := e.users.Save(u); err != nil {
+		t.Fatalf("Save %s: %v", uid, err)
+	}
+}
+
+func TestCariNearbyProfilTemanChatStatus(t *testing.T) {
+	e := newEnv(t)
+	alice := e.client(t)
+	alice.ready("alice@example.com", "female", "ID")
+	bob := e.client(t)
+	bob.ready("bob@example.com", "male", "ID")
+	ceri := e.client(t)
+	ceri.ready("ceri@example.com", "other", "ID")
+
+	e.setGeo(t, "dev:alice@example.com", "Jakarta", -6.2, 106.8)
+	e.setGeo(t, "dev:bob@example.com", "Bandung", -6.9, 107.6)
+	// ceri sengaja tanpa geo: tetap tampil tapi tanpa jarak.
+
+	// Alice melihat daftar: ada bob dan ceri, bob (berteman kota) di atas ceri (tanpa geo).
+	code, body := alice.do("GET", "/api/nearby", "")
+	if code != 200 || !strings.Contains(body, `"bob"`) || !strings.Contains(body, `"ceri"`) {
+		t.Fatalf("nearby alice = %d %s", code, body)
+	}
+	if strings.Index(body, `"bob"`) > strings.Index(body, `"ceri"`) {
+		t.Errorf("urutan salah: bob (ada geo) harus sebelum ceri (tanpa geo): %s", body)
+	}
+	if !strings.Contains(body, `"city":"Bandung"`) {
+		t.Errorf("kota bob tidak tampil: %s", body)
+	}
+
+	// Profil publik bob terbuka oleh alice.
+	code, body = alice.do("GET", "/api/nearby/dev:bob@example.com", "")
+	if code != 200 || !strings.Contains(body, `"isFriend":false`) {
+		t.Fatalf("profil bob = %d %s", code, body)
+	}
+
+	// Belum berteman → chat ditolak.
+	code, _ = alice.do("GET", "/api/dm/dev:bob@example.com", "")
+	if code != 403 {
+		t.Errorf("dm sebelum berteman = %d, mau 403", code)
+	}
+
+	// Tambah teman.
+	code, body = alice.do("POST", "/api/nearby/dev:bob@example.com/friend", "{}")
+	if code != 200 {
+		t.Fatalf("add friend = %d %s", code, body)
+	}
+	code, body = alice.do("GET", "/api/friends", "")
+	if code != 200 || !strings.Contains(body, `"bob"`) {
+		t.Fatalf("daftar teman alice = %d %s", code, body)
+	}
+
+	// Chat: alice kirim teks, bob membalas; keduanya saling melihat.
+	code, body = alice.doMultipart("POST", "/api/dm/dev:bob@example.com",
+		map[string]string{"kind": "text", "text": "halo bob!"}, "", "", nil)
+	if code != 200 || !strings.Contains(body, "halo bob!") {
+		t.Fatalf("kirim dm = %d %s", code, body)
+	}
+	code, body = bob.do("GET", "/api/dm/dev:alice@example.com?since=0", "")
+	if code != 200 || !strings.Contains(body, "halo bob!") {
+		t.Fatalf("dm diterima bob = %d %s", code, body)
+	}
+
+	// Stiker gaya 2013 diterima.
+	code, body = bob.doMultipart("POST", "/api/dm/dev:alice@example.com",
+		map[string]string{"kind": "sticker", "text": "cool"}, "", "", nil)
+	if code != 200 || !strings.Contains(body, `"sticker"`) {
+		t.Fatalf("stiker = %d %s", code, body)
+	}
+
+	// Orang asing (ceri) tidak bisa mengirim pesan ke alice.
+	code, _ = ceri.do("GET", "/api/dm/dev:alice@example.com", "")
+	if code != 403 {
+		t.Errorf("dm orang asing = %d, mau 403", code)
+	}
+
+	// Status: alice memposting teks, muncul di feed bob.
+	code, body = alice.doMultipart("POST", "/api/posts", map[string]string{"text": "status pertama!"}, "", "", nil)
+	if code != 200 || !strings.Contains(body, "status pertama!") {
+		t.Fatalf("post = %d %s", code, body)
+	}
+	code, body = bob.do("GET", "/api/posts", "")
+	if code != 200 || !strings.Contains(body, "status pertama!") || !strings.Contains(body, "alice") {
+		t.Fatalf("feed bob = %d %s", code, body)
+	}
+	// Status kosong ditolak.
+	code, _ = bob.doMultipart("POST", "/api/posts", map[string]string{"text": "   "}, "", "", nil)
+	if code != 400 {
+		t.Errorf("post kosong = %d, mau 400", code)
+	}
+
+	// Alice menyembunyikan diri → hilang dari daftar bob.
+	code, _ = alice.do("POST", "/api/nearby/pref", `{"show":false}`)
+	if code != 200 {
+		t.Fatalf("pref = %d", code)
+	}
+	code, body = bob.do("GET", "/api/nearby", "")
+	if code == 200 && strings.Contains(body, `"alice"`) {
+		t.Errorf("alice sudah sembunyi tapi masih tampil di bob: %s", body)
+	}
 }
