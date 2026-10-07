@@ -48,8 +48,6 @@ type User struct {
 	Birthdate    string    `json:"birthdate"`              // format YYYY-MM-DD, terkunci setelah diisi
 	Gender       Gender    `json:"gender"`
 	Country      string    `json:"country"` // kode ISO 3166-1 alpha-2, huruf besar
-	Geo          *Geo      `json:"geo,omitempty"`      // lokasi kasar dari IP (kota), diisi saat login
-	HideNearby   bool      `json:"hideNearby,omitempty"` // true bila tidak ingin tampil di Cari
 	CreatedAt    time.Time `json:"createdAt"`
 }
 

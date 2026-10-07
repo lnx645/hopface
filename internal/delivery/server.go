@@ -53,13 +53,11 @@ type Deps struct {
 	Accounts   *usecase.Accounts
 	Moderation *usecase.Moderation
 	Lobby      *usecase.Lobby
-	Social     *usecase.Social   // fitur Cari: nearby, status, pertemanan, chat
 	Signer     TokenSigner
 	Identity   IdentityProvider
 	ICE        ICEProvider
 	Static     fs.FS // hasil build frontend (di-embed)
 	Avatar     *infra.AvatarStore
-	Uploads    *infra.UploadStore // gambar status & pesan
 	Now        func() time.Time
 }
 
@@ -109,18 +107,6 @@ func New(d Deps) http.Handler {
 			r.Post("/profile/avatar", s.uploadAvatar)
 			r.Post("/profile/avatar/reset", s.resetAvatar)
 			r.Get("/ice", s.ice)
-			// Fitur Cari: orang terdekat, status, pertemanan, chat pertemanan.
-			if s.Social != nil {
-				r.Get("/nearby", s.nearbyList)
-				r.Post("/nearby/pref", s.nearbyPref)
-				r.Get("/nearby/{id}", s.nearbyProfile)
-				r.Post("/nearby/{id}/friend", s.nearbyAddFriend)
-				r.Get("/friends", s.friendsList)
-				r.Get("/posts", s.postsList)
-				r.Post("/posts", s.postsCreate)
-				r.Get("/dm/{id}", s.dmList)
-				r.Post("/dm/{id}", s.dmSend)
-			}
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(s.requireAdmin)
 				r.Get("/reports", s.adminReports)
@@ -133,9 +119,6 @@ func New(d Deps) http.Handler {
 
 	r.Get("/avatar/default.svg", s.defaultAvatar)
 	r.Get("/avatar/{name}", s.serveAvatar)
-	if d.Uploads != nil {
-		r.Get("/img/uploads/{name}", s.serveUpload)
-	}
 	r.With(s.requireUser).Get("/ws", s.ws)
 	r.NotFound(spaHandler(d.Static).ServeHTTP)
 	return r

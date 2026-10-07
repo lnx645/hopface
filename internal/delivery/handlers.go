@@ -92,7 +92,6 @@ func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Gagal menyimpan akun.", http.StatusInternalServerError)
 		return
 	}
-	s.Accounts.RefreshGeo(u.ID, remoteIP(r)) // lokasi kasar untuk fitur Cari (best effort)
 	s.setSession(w, u.ID)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
@@ -116,7 +115,6 @@ func (s *Server) devLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.Accounts.RefreshGeo(u.ID, remoteIP(r)) // mode dev: lokasi tetap dari DevGeo
 	s.setSession(w, u.ID)
 	http.Redirect(w, r, "/", http.StatusFound)
 }

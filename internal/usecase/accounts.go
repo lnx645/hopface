@@ -14,17 +14,10 @@ type AvatarSaver interface {
 	SaveAvatar(userID string, src []byte) (filename string, err error)
 }
 
-// GeoResolver mengubah IP menjadi lokasi kasar (kota) untuk fitur Cari.
-// Diimplementasikan di infra; nil bila fitur lokasi tidak diaktifkan.
-type GeoResolver interface {
-	Resolve(ip string) (domain.Geo, error)
-}
-
 // Accounts mengelola akun pengguna dan profil.
 type Accounts struct {
 	users  domain.UserRepository
 	avatar AvatarSaver
-	geo    GeoResolver
 	now    func() time.Time
 }
 
@@ -58,32 +51,6 @@ func (a *Accounts) Upsert(id, email, name, picture string) (domain.User, error) 
 
 // Get mengambil pengguna.
 func (a *Accounts) Get(id string) (domain.User, error) { return a.users.Get(id) }
-
-// SetGeoResolver memasang resolver lokasi kasar (dipanggil saat wiring).
-func (a *Accounts) SetGeoResolver(r GeoResolver) { a.geo = r }
-
-// RefreshGeo memperbarui lokasi kasar pengguna dari IP login. Best effort:
-// kegagalan jaringan atau IP privat tidak membuat login gagal. Lokasi hanya
-// disegarkan bila kosong atau lebih tua dari 7 hari.
-func (a *Accounts) RefreshGeo(id, ip string) {
-	if a.geo == nil || ip == "" {
-		return
-	}
-	u, err := a.users.Get(id)
-	if err != nil {
-		return
-	}
-	if u.Geo != nil && a.now().Sub(u.Geo.At) < 7*24*time.Hour {
-		return
-	}
-	g, err := a.geo.Resolve(ip)
-	if err != nil || g.City == "" {
-		return
-	}
-	g.At = a.now()
-	u.Geo = &g
-	_ = a.users.Save(u)
-}
 
 // UpdateProfile mengisi profil dengan validasi. Tanggal lahir terkunci setelah pertama kali diisi;
 // nama yang disimpan selalu dianggap kustom sehingga login Google berikutnya tidak menimpanya.
