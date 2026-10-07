@@ -21,6 +21,7 @@ const RELAX_MS = 10000 // harus sama dengan batas di server (Matchmaker.RelaxAft
 
 const link = ref('connecting') // connecting | open | closed
 const state = ref('idle') // idle | searching | chatting (mengikuti server)
+const starting = ref(false) // true sejak Start diklik sampai server menjawab (cegah klik dobel + tampilkan loading)
 const peer = ref(null)
 const msgs = ref([])
 const draft = ref('')
@@ -163,6 +164,7 @@ function onEvent(e) {
   switch (e.t) {
     case 'state':
       state.value = e.state
+      starting.value = false // balasan server: masa Start sudah selesai
       online.value = e.online || 0
       waiting.value = e.waiting || 0
       if (e.state === 'searching') {
@@ -180,6 +182,7 @@ function onEvent(e) {
       break
     case 'matched':
       state.value = 'chatting'
+      starting.value = false
       peer.value = e.peer
       msgs.value = []
       lastFrame = '' // bukti frame milik pasangan sebelumnya tidak boleh tercampur
@@ -208,6 +211,7 @@ function onEvent(e) {
       sys('Report sent. Thank you. You were moved to someone new.')
       break
     case 'error':
+      starting.value = false // jangan pernah mengunci tombol Start bila server menolak
       if (e.error === 'banned' || e.error === 'replaced') {
         notice.value = ERRORS[e.error]
         stopCall()
@@ -231,11 +235,17 @@ function currentFilter() {
 }
 
 async function start() {
+  // Klik dobel diabaikan: selama masa jeda (izin kamera + balasan server)
+  // tombol terkunci dan loading tampil, bukan diam saja.
+  if (starting.value || state.value !== 'idle') return
+  starting.value = true
   notice.value = ''
   await ensureMedia()
+  if (state.value !== 'idle') { starting.value = false; return } // sudah berubah di tengah jalan
   const f = currentFilter()
   localStorage.setItem('hopface.filter', JSON.stringify({ ...f, textOnly: textOnly.value }))
   sock.send({ t: 'start', filter: f })
+  // starting tetap true sampai server mengirim event state (lihat onEvent).
 }
 
 function next() { sock.send({ t: 'next' }) }
@@ -284,7 +294,7 @@ onMounted(() => {
     const s = JSON.parse(localStorage.getItem('hopface.filter') || 'null')
     if (s) { Object.assign(filter, { gender: s.gender || '', minAge: s.minAge || 18, maxAge: s.maxAge || 99, country: s.country || '' }); textOnly.value = !!s.textOnly }
   } catch { /* abaikan filter tersimpan yang rusak */ }
-  sock = connectSocket({ onEvent, onStatus: (s) => { link.value = s; if (s === 'closed') { state.value = 'idle'; peer.value = null; stopCall() } } })
+  sock = connectSocket({ onEvent, onStatus: (s) => { link.value = s; if (s === 'closed') { state.value = 'idle'; starting.value = false; peer.value = null; stopCall() } } })
   timer = setInterval(() => { now.value = Date.now() }, 1000)
   // Ambil frame pasangan berkala selama chat supaya bukti selalu ada saat laporan dikirim.
   snapTimer = setInterval(() => {
@@ -338,8 +348,10 @@ onBeforeUnmount(() => {
         <video ref="localEl" class="local" autoplay playsinline muted v-show="!textOnly"></video>
 
         <div v-if="state === 'idle'" class="overlay">
-          <img v-if="link !== 'open'" class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
-          <b>{{ link === 'open' ? 'Press Start to find someone' : 'Connecting…' }}</b>
+          <img v-if="link !== 'open' || starting" class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
+          <b v-if="starting">Starting…</b>
+          <b v-else>{{ link === 'open' ? 'Press Start to find someone' : 'Connecting…' }}</b>
+          <span v-if="starting">Preparing camera and joining the queue, one moment…</span>
         </div>
         <div v-else-if="state === 'searching'" class="overlay">
           <img class="spin" src="/img/ajax-loader.gif" alt="" width="28" height="28">
@@ -399,7 +411,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div class="row">
-        <button v-if="state === 'idle'" class="btn green big" type="button" :disabled="link !== 'open'" @click="start"><i class="icon-play"></i> Start</button>
+        <button v-if="state === 'idle'" class="btn green big" type="button" :disabled="link !== 'open' || starting" @click="start">
+          <img v-if="starting" src="/img/ajax-loader.gif" alt="" width="16" height="16" style="vertical-align:-3px">
+          <i v-else class="icon-play"></i> {{ starting ? 'Starting…' : 'Start' }}
+        </button>
         <template v-else>
           <button v-if="state === 'chatting'" class="btn green big" type="button" :disabled="mobileTypingLock" @click="next"><i class="icon-forward"></i> Next</button>
           <button class="btn red big" type="button" :disabled="mobileTypingLock" @click="stop"><i class="icon-stop"></i> Stop</button>
