@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -46,7 +45,7 @@ func (s *Server) nearbyList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) nearbyProfile(w http.ResponseWriter, r *http.Request) {
-	p, err := s.Social.PublicProfileOf(userFrom(r).ID, urlID(r))
+	p, err := s.Social.PublicProfileOf(userFrom(r).ID, chi.URLParam(r, "id"))
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found")
@@ -60,7 +59,7 @@ func (s *Server) nearbyProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) nearbyAddFriend(w http.ResponseWriter, r *http.Request) {
-	err := s.Social.AddFriend(userFrom(r).ID, urlID(r))
+	err := s.Social.AddFriend(userFrom(r).ID, chi.URLParam(r, "id"))
 	switch {
 	case errors.Is(err, domain.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found")
@@ -145,7 +144,7 @@ func (s *Server) dmList(w http.ResponseWriter, r *http.Request) {
 			since = time.Unix(0, ms*int64(time.Millisecond))
 		}
 	}
-	msgs, err := s.Social.DMs(userFrom(r).ID, urlID(r), since)
+	msgs, err := s.Social.DMs(userFrom(r).ID, chi.URLParam(r, "id"), since)
 	switch {
 	case errors.Is(err, domain.ErrNotFriends):
 		writeErr(w, http.StatusForbidden, "not_friends")
@@ -181,7 +180,7 @@ func (s *Server) dmSend(w http.ResponseWriter, r *http.Request) {
 	if kind == "" {
 		kind = domain.MsgText
 	}
-	m, err := s.Social.SendDM(userFrom(r).ID, urlID(r), kind, text)
+	m, err := s.Social.SendDM(userFrom(r).ID, chi.URLParam(r, "id"), kind, text)
 	switch {
 	case errors.Is(err, domain.ErrNotFriends):
 		writeErr(w, http.StatusForbidden, "not_friends")
@@ -217,15 +216,4 @@ func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 // jsonDecode membaca JSON tubuh request dengan batas ukuran aman.
 func jsonDecode(r *http.Request, v interface{}) error {
 	return json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(v)
-}
-
-// urlID membaca parameter rute {id} lalu meng-decode percent-encoding-nya.
-// chi mencocokkan rute pada RawPath, sehingga nilai param masih ter-encode
-// (mis. "g%3A123" untuk ID "g:123") dan harus dilepas dulu sebelum dicari.
-func urlID(r *http.Request) string {
-	raw := chi.URLParam(r, "id")
-	if dec, err := url.PathUnescape(raw); err == nil {
-		return dec
-	}
-	return raw
 }

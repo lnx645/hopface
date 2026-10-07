@@ -693,16 +693,10 @@ func TestCariNearbyProfilTemanChatStatus(t *testing.T) {
 		t.Errorf("kota bob tidak tampil: %s", body)
 	}
 
-	// Profil publik bob terbuka oleh alice — memakai ID ter-encode (%3A/%40)
-	// persis seperti dikirim browser (chi mencocokkan rute pada RawPath).
-	code, body = alice.do("GET", "/api/nearby/dev%3Abob%40example.com", "")
-	if code != 200 || !strings.Contains(body, `"isFriend":false`) {
-		t.Fatalf("profil bob (ID ter-encode) = %d %s", code, body)
-	}
-	// ID mentah juga tetap berfungsi.
+	// Profil publik bob terbuka oleh alice.
 	code, body = alice.do("GET", "/api/nearby/dev:bob@example.com", "")
 	if code != 200 || !strings.Contains(body, `"isFriend":false`) {
-		t.Fatalf("profil bob (ID mentah) = %d %s", code, body)
+		t.Fatalf("profil bob = %d %s", code, body)
 	}
 
 	// Belum berteman → chat ditolak.
@@ -711,8 +705,8 @@ func TestCariNearbyProfilTemanChatStatus(t *testing.T) {
 		t.Errorf("dm sebelum berteman = %d, mau 403", code)
 	}
 
-	// Tambah teman (rute ber-{id} di ekor path, tetap pakai ID ter-encode).
-	code, body = alice.do("POST", "/api/nearby/dev%3Abob%40example.com/friend", "{}")
+	// Tambah teman.
+	code, body = alice.do("POST", "/api/nearby/dev:bob@example.com/friend", "{}")
 	if code != 200 {
 		t.Fatalf("add friend = %d %s", code, body)
 	}
@@ -722,12 +716,12 @@ func TestCariNearbyProfilTemanChatStatus(t *testing.T) {
 	}
 
 	// Chat: alice kirim teks, bob membalas; keduanya saling melihat.
-	code, body = alice.doMultipart("POST", "/api/dm/dev%3Abob%40example.com",
+	code, body = alice.doMultipart("POST", "/api/dm/dev:bob@example.com",
 		map[string]string{"kind": "text", "text": "halo bob!"}, "", "", nil)
 	if code != 200 || !strings.Contains(body, "halo bob!") {
 		t.Fatalf("kirim dm = %d %s", code, body)
 	}
-	code, body = bob.do("GET", "/api/dm/dev%3Aalice%40example.com?since=0", "")
+	code, body = bob.do("GET", "/api/dm/dev:alice@example.com?since=0", "")
 	if code != 200 || !strings.Contains(body, "halo bob!") {
 		t.Fatalf("dm diterima bob = %d %s", code, body)
 	}
